@@ -1,11 +1,48 @@
 ---
 name: godot-gdscript-to-csharp
-description: Port Godot 3 GDScript to Godot 4 C# slice by slice. Use when translating .gd files to .cs in a Godot 4 mono project, when migrated gameplay code compiles but silently does nothing at runtime, or when a C# port misbehaves only in real gameplay or under load. Covers migration order, dual-API bridging, silent-failure traps, and verification.
+description: Port Godot 3 GDScript to Godot 4 (GDScript and/or C#). Use when translating .gd files to .cs in a Godot 4 mono project, when migrated gameplay code compiles but silently does nothing at runtime, or when a C# port misbehaves only in real gameplay or under load. Covers migration order, 3-to-4 GDScript deltas, dual-API bridging, silent-failure traps, and verification.
 ---
 
-# Godot GDScript → C# Slice Migration
+# Godot GDScript Migration (3 to 4, GDScript and/or CSharp)
 
-You are migrating a Godot 3 GDScript project to Godot 4 C# (mono), one slice at a time.
+You are migrating a Godot 3 GDScript project to Godot 4, in three supported paths:
+
+1. **Godot 3 GDScript to Godot 4 GDScript** (new engine, same language), see section A.
+2. **Godot 4 GDScript to Godot 4 CSharp** (same engine, new language), see main sections below.
+3. **Godot 3 GDScript to Godot 4 CSharp** (both at once): do section A first, then the rest.
+   Never debug engine and language changes in the same step.
+
+## A. Godot 3 to 4 GDScript deltas (same language)
+
+Syntax annotations first (`export` becomes `@export`, `onready` becomes `@onready`,
+`tool` becomes `@tool`, RPC keywords become `@rpc`), then these behavior changes:
+
+- `yield(obj, "sig")` becomes `await obj.sig`; one-frame yield becomes
+  `await get_tree().process_frame`.
+- `Tween` node plus `interpolate_property` becomes `create_tween()` plus
+  `tween_property()` (tweens are one-shot; parallel and sequence via chaining,
+  not node config).
+- `KinematicBody2D` becomes `CharacterBody2D`, and `move_and_slide()` takes
+  **no arguments** (it consumes the `velocity` property);
+  `move_and_collide` keeps its signature.
+- `File` and `Directory` become `FileAccess` and `DirAccess`; `JSON.parse`
+  becomes `JSON.parse_string`; `OS.get_ticks_msec()` becomes
+  `Time.get_ticks_msec()`.
+- `VisualServer` becomes `RenderingServer`; shader built-ins are restricted:
+  sampling must happen in `fragment()` (custom functions cannot see `TEXTURE`).
+- `CPUParticles2D`, `GPUParticles2D` and `AudioServer` buses are largely unchanged;
+  `AudioBusLayout` serialization must be complete (`format=3`, all `send` entries written).
+- `Camera2D`, `CanvasModulate`, groups, `$Node` and `%UniqueName` paths, and `tr()`
+  translations: same concepts, verify per use. `TileMap` becomes `TileMapLayer` on 4.3+.
+- Scene files use `format=3`, resources gain `uid` attributes; node names must stay
+  untouched (never "normalize" them: animation tracks, connections and `GetNode`
+  paths all chain off names).
+- Old high-level multiplayer networking was rewritten: out of scope here.
+  Isolate and rewrite separately, never inside a language migration.
+- After this step the project must run **fully in GDScript on Godot 4** before any
+  `.gd` to `.cs` translation begins. That isolates engine bugs from language bugs.
+
+The C# translation below assumes path 2 or a completed section A.
 
 ## Order of work
 

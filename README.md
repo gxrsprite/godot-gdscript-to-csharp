@@ -1,6 +1,6 @@
 # godot-gdscript-to-csharp
 
-把 Godot 3 GDScript 项目一片一片迁到 Godot 4 C#（mono）的实战 skill。
+把 Godot 3 GDScript 项目迁到 Godot 4（GDScript 和/或 C#）的实战 skill，支持三条路径：3 GDScript → 4 GDScript、4 GDScript → 4 C#、3 GDScript → 4 C#。
 
 > English: a skill for porting Godot 3 GDScript to Godot 4 C#, slice by slice —
 > conventions, silent-failure traps, and verification. See [SKILL.md](./SKILL.md).
@@ -12,7 +12,8 @@
 
 ## 适用范围
 
-- ✅ Godot 3 GDScript → Godot 4 C#（mono/.NET）的玩法代码迁移
+- ✅ Godot 3 GDScript → Godot 4 GDScript（换引擎不换语言）
+- ✅ Godot 4 GDScript → Godot 4 C#（换语言不换引擎）的玩法代码迁移
 - ✅ 渐进式迁移：GD 与 C# 共存、一次只迁一片、删 GD 前后各验证一次
 - ✅ 排查"编译全绿但运行时静默失效"的问题（信号没连上、反射调不到、布局塌陷……）
 - ✅ 重压场景性能定位（headless 量不到渲染时的替代方案）
