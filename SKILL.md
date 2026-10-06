@@ -55,6 +55,13 @@ The C# translation below assumes path 2 or a completed section A.
 4. **Four-piece verification per slice**: `dotnet build` → Godot load/import →
    directed assertions (smoke) → compare against the GD baseline. Missing one means
    the slice is not done. Run the checks **before and after deleting the `.gd`**.
+   For layout fixes, resource-load logs prove nothing ("scene loaded" ≠ "scene
+   rendered") — screenshot the real Release build in the real scene.
+5. **Data resources before scripts**: source prefix becomes the in-project dir,
+   script refs become PascalCase files, texture types updated, directory case
+   normalized, audio copied too. Never hand-write import metadata.
+6. **Scan every converted resource/scene for script refs** and verify each
+   target exists on disk.
 
 ## Bridging conventions (while GD callers still exist)
 
@@ -67,6 +74,10 @@ The C# translation below assumes path 2 or a completed section A.
 - Signals via `SignalName`, `await` via `ToSignal` plus alive re-checks.
 - `Callable.From(handler)` passed to `Connect()` must be kept alive in a static
   collection, or GC will silently kill the callback; prefer C# events.
+- When the target C# class is `partial`, merge incoming logic directly; on
+  member-name collision rename the incoming side and add a one-line hook call
+  in the base method (pre/post/passthrough decided in the hook).
+  Keep a call-point list at the top of each merged file.
 
 ## Silent-failure traps (build green, runs wrong)
 
@@ -104,39 +115,25 @@ The C# translation below assumes path 2 or a completed section A.
 9. **`GD.Randi()`'s return type has changed across GodotSharp versions** — check your
    version's signature and cast explicitly before `%` or int arithmetic. Enums need
    `(int)` casts. `Godot.Collections.Array` has no `Sort_custom` (use LINQ or loops).
-   Array literals are read-only — `.duplicate()` before mutating.
-
-## Porting layered content packs (data + scripts)
-
-A content pack (new entities/items/weapons plus scripts that extend core
-classes) ports in layers: **data resources first, effect scripts second,
-extension scripts third, registration last.**
-
-- Data rewrite rules (mechanical, scriptable): source prefix becomes the
-  in-project content dir; core script refs keep their path but become
-  PascalCase files (`effect.gd` → `Effect.cs`); pack-owned scripts point at
-  their future homes (build those next); texture types updated to the engine's
-  current names; normalize directory case and keep filenames otherwise;
-  copy audio too; never hand-write import metadata — the engine generates it
-  on boot.
-- After conversion, scan every resource/scene for script refs and check each
-  target exists on disk (one dangling script ref kills the referencing scene
-  at load, cascading into thousands of log errors from a single bad path).
-- Extension scripts (add-ons to core classes): if the target C# class is
-  `partial`, merge directly; on member-name collision rename the incoming side
-  and add a one-line hook call in the base method (pre/post/passthrough
-  decided explicitly in the hook). Keep a call-point list at the top of each
-  merged file so the wiring is auditable.
-- API facts worth re-verifying on each engine version: packed array types may
-  not exist in C# bindings — use `List<T>`/`T[]` (`.ToArray()` at engine
-  boundaries); particle/sprite member names change case between versions
-  (`Hframes`, fill-mode enum names); collection types may lack
-  `Erase/PopBack/Front/Back/Sort_custom` (use `Remove/RemoveAt`/index);
-  `TopLevel` property vs setter; shape `Size` vs `Extents`;
-  `GetPhysicsFrames()` returns `ulong`; random-range returns double
-  (cast to float); `Play(name)` takes no bool flag.
-- Preserve file line endings in bulk-fix scripts (CRLF vs LF per file), or the
-  diff drowns the fix.
+   Array literals are read-only — `.duplicate()` before mutating. Names that
+   move between versions: no packed array types in some C# bindings — use
+   `List<T>`/`T[]` (`.ToArray()` at engine boundaries);
+   particle/sprite member case (`Hframes`, fill-mode enum names); collection
+   methods (`Erase/PopBack/Front/Back` → `Remove/RemoveAt`/index); `TopLevel`
+   property vs setter; shape `Size` vs `Extents`; `GetPhysicsFrames()` returns
+   `ulong`; random-range returns double (cast to float); `Play(name)` takes no
+   bool flag.
+10. **Preserve file line endings in bulk-fix scripts** (CRLF vs LF per file).
+11. **Godot 3 scene-positioning residue collapses Release-only layouts.** Centered
+    anchors with giant offsets, fixed `offset_*` on container children (containers
+    ignore offsets — the constraint silently does nothing), and a `ScrollContainer`
+    anchored on one axis only. Debug layout timing happens to hold it up; a
+    zero-size Release first frame collapses it (symptom: section titles visible,
+    grids empty). Don't patch it at runtime with `SetAnchors*` — rebuild the layer
+    container-driven (`layout_mode = 2` + `size_flags` + full-rect scroll +
+    stretch ratios). Guard code side too: fall back element sizes/theme constants,
+    and never write `CustomMinimumSize` from a zero-size viewport (wait for
+    `Resized`).
 
 ## Performance: measure in-game, never headless
 
