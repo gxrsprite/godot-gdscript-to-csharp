@@ -106,6 +106,38 @@ The C# translation below assumes path 2 or a completed section A.
    `(int)` casts. `Godot.Collections.Array` has no `Sort_custom` (use LINQ or loops).
    Array literals are read-only — `.duplicate()` before mutating.
 
+## Porting layered content packs (data + scripts)
+
+A content pack (new entities/items/weapons plus scripts that extend core
+classes) ports in layers: **data resources first, effect scripts second,
+extension scripts third, registration last.**
+
+- Data rewrite rules (mechanical, scriptable): source prefix becomes the
+  in-project content dir; core script refs keep their path but become
+  PascalCase files (`effect.gd` → `Effect.cs`); pack-owned scripts point at
+  their future homes (build those next); texture types updated to the engine's
+  current names; normalize directory case and keep filenames otherwise;
+  copy audio too; never hand-write import metadata — the engine generates it
+  on boot.
+- After conversion, scan every resource/scene for script refs and check each
+  target exists on disk (one dangling script ref kills the referencing scene
+  at load, cascading into thousands of log errors from a single bad path).
+- Extension scripts (add-ons to core classes): if the target C# class is
+  `partial`, merge directly; on member-name collision rename the incoming side
+  and add a one-line hook call in the base method (pre/post/passthrough
+  decided explicitly in the hook). Keep a call-point list at the top of each
+  merged file so the wiring is auditable.
+- API facts worth re-verifying on each engine version: packed array types may
+  not exist in C# bindings — use `List<T>`/`T[]` (`.ToArray()` at engine
+  boundaries); particle/sprite member names change case between versions
+  (`Hframes`, fill-mode enum names); collection types may lack
+  `Erase/PopBack/Front/Back/Sort_custom` (use `Remove/RemoveAt`/index);
+  `TopLevel` property vs setter; shape `Size` vs `Extents`;
+  `GetPhysicsFrames()` returns `ulong`; random-range returns double
+  (cast to float); `Play(name)` takes no bool flag.
+- Preserve file line endings in bulk-fix scripts (CRLF vs LF per file), or the
+  diff drowns the fix.
+
 ## Performance: measure in-game, never headless
 
 - Headless uses a dummy renderer: **zero sprites/particles/text drawn**. A scene that
